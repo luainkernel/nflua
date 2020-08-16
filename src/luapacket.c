@@ -29,7 +29,6 @@
 #include "luapacket.h"
 #include "luautil.h"
 #include "nf_util.h"
-#include "states.h"
 #include "xt_lua.h"
 
 struct luapacket {

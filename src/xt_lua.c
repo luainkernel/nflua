@@ -28,8 +28,6 @@
 
 #include "xt_lua.h"
 #include "nf_util.h"
-#include "netlink.h"
-#include "states.h"
 #include "kpi_compat.h"
 #include "luapacket.h"
 #include "luautil.h"
@@ -38,6 +36,13 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("CUJO LLC <opensource@cujo.com>");
 
 MODULE_DESCRIPTION("Xtables: Lua packet match and target");
+
+extern int luaopen_packet(lua_State *);
+
+static const luaL_Reg libs[] = {
+	{"packet", luaopen_packet},
+	{NULL, NULL}
+};
 
 luaU_id nflua_ctx;
 luaU_id nflua_sock;
@@ -54,19 +59,25 @@ static void nflua_mt_destroy(const struct xt_mtdtor_param *par)
 	struct xt_lua_mtinfo *info = par->matchinfo;
 
 	if (info->state != NULL)
-		nflua_state_put(info->state);
+		lunatik_putstate(info->state);
 }
 
 static int nflua_mt_checkentry(const struct xt_mtchk_param *par)
 {
 	struct xt_lua_mtinfo *info = par->matchinfo;
-	struct nflua_state *s;
+	lunatik_State *s;
+	const luaL_Reg *lib;
 
-	if ((s = nflua_state_lookup(xt_lua_pernet(par->net), info->name)) == NULL)
+	if ((s = lunatik_netstatelookup(info->name, par->net)) == NULL)
 		return -EPERM;
 
-	if (!nflua_state_get(s))
+	if (!lunatik_getstate(s))
 		return -ESTALE;
+
+	for (lib = libs; lib->name != NULL; lib++) {
+		luaL_requiref(s->L, lib->name, lib->func, 1);
+		lua_pop(s->L, 1);
+	}
 
 	info->state = s;
 	return 0;
@@ -208,20 +219,26 @@ static void nflua_tg_destroy(const struct xt_tgdtor_param *par)
 	struct xt_lua_mtinfo *info = par->targinfo;
 
 	if (info->state != NULL)
-		nflua_state_put(info->state);
+		lunatik_putstate(info->state);
 }
 
 static int nflua_tg_checkentry(const struct xt_tgchk_param *par)
 {
 	struct xt_lua_mtinfo *info = par->targinfo;
-	struct nflua_state *s;
+	lunatik_State *s;
+	const luaL_Reg *lib;
 
-	s = nflua_state_lookup(xt_lua_pernet(par->net), info->name);
+	s = lunatik_netstatelookup(info->name, par->net);
 	if (s == NULL)
 		return -ENOENT;
 
-	if (!nflua_state_get(s))
+	if (!lunatik_getstate(s))
 		return -ESTALE;
+
+	for (lib = libs; lib->name != NULL; lib++) {
+		luaL_requiref(s->L, lib->name, lib->func, 1);
+		lua_pop(s->L, 1);
+	}
 
 	info->state = s;
 	return 0;
@@ -261,61 +278,17 @@ static struct xt_target nflua_tg_reg __read_mostly = {
 	.me         = THIS_MODULE
 };
 
-static int __net_init xt_lua_net_init(struct net *net)
-{
-	struct xt_lua_net *xt_lua = xt_lua_pernet(net);
-
-	nflua_states_init(xt_lua);
-
-	if (nflua_netlink_init(xt_lua, net)) {
-		pr_err("Netlink Socket initialization failed!\n");
-		return -ENOMEM;
-	}
-
-	return 0;
-}
-
-static void __net_exit xt_lua_net_exit(struct net *net)
-{
-	struct xt_lua_net *xt_lua = xt_lua_pernet(net);
-
-	nflua_netlink_exit(xt_lua);
-	nflua_states_exit(xt_lua);
-}
-
-static struct pernet_operations xt_lua_net_ops = {
-	.init = xt_lua_net_init,
-	.exit = xt_lua_net_exit,
-	.id   = &xt_lua_net_id,
-	.size = sizeof(struct xt_lua_net),
-};
-
-static struct notifier_block nl_notifier = {
-	.notifier_call  = nflua_rcv_nl_event,
-};
-
 static int __init xt_lua_init(void)
 {
 	int ret;
 
 	pr_debug("initializing module\n");
 
-	if ((ret = kpi_init()))
-		return ret;
-
-	if ((ret = register_pernet_subsys(&xt_lua_net_ops)))
-		return ret;
-
-	if ((ret = netlink_register_notifier(&nl_notifier)))
-		return ret;
-
 	if ((ret = xt_register_match(&nflua_mt_reg))) {
-		unregister_pernet_subsys(&xt_lua_net_ops);
 		return ret;
 	}
 
 	if ((ret = xt_register_target(&nflua_tg_reg))) {
-		unregister_pernet_subsys(&xt_lua_net_ops);
 		xt_unregister_match(&nflua_mt_reg);
 		return ret;
 	}
@@ -328,8 +301,6 @@ static void __exit xt_lua_exit(void)
 	pr_debug("unloading module\n");
 	xt_unregister_match(&nflua_mt_reg);
 	xt_unregister_target(&nflua_tg_reg);
-	unregister_pernet_subsys(&xt_lua_net_ops);
-	netlink_unregister_notifier(&nl_notifier);
 }
 
 module_init(xt_lua_init);

@@ -20,10 +20,12 @@
 #define _XT_LUA_COMMON_H
 
 #include <linux/types.h>
-
+#ifdef _KERNEL
+#include <lunatik.h>
+#endif
 #include "nfluaconf.h"
 
-struct nflua_state;
+typedef struct lunatik_state lunatik_State;
 
 enum {
 	XT_NFLUA_TCP_PAYLOAD = 0x01
@@ -35,7 +37,7 @@ struct xt_lua_mtinfo {
 	__u8 flags;
 
 	/* kernel only */
-	struct nflua_state *state  __attribute__((aligned(8)));
+	lunatik_State *state  __attribute__((aligned(8)));
 };
 
 #endif /* _XT_LUA_COMMON_H */

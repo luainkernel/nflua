@@ -17,7 +17,7 @@
 #
 
 CC = gcc
-CFLAGS = -fPIC -Wall -Wextra -O2 -g -I../src
+CFLAGS = -fPIC -Wall -Wextra -O2 -g -I../src -I../deps/lunatik
 LDFLAGS = -shared -lxtables
 RM = rm -f
 

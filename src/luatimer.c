@@ -25,7 +25,8 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include "states.h"
+#include <lunatik.h>
+
 #include "luautil.h"
 #include "kpi_compat.h"
 
@@ -33,15 +34,15 @@
 
 struct nftimer_ctx {
 	struct timer_list timer;
-	struct nflua_state *state;
+	lunatik_State *state;
 };
 
-static bool state_get(struct nflua_state *s)
+static bool state_get(lunatik_State *s)
 {
 	if (!try_module_get(THIS_MODULE))
 		return false;
 
-	if (!nflua_state_get(s)) {
+	if (!lunatik_getstate(s)) {
 		module_put(THIS_MODULE);
 		return false;
 	}
@@ -49,18 +50,18 @@ static bool state_get(struct nflua_state *s)
 	return true;
 }
 
-static void state_put(struct nflua_state *s)
+static void state_put(lunatik_State *s)
 {
 	if (WARN_ON(s == NULL))
 		return;
 
-	nflua_state_put(s);
+	lunatik_putstate(s);
 	module_put(THIS_MODULE);
 }
 
-static void timeout_cb(kpi_timer_list_t l)
+static void timeout_cb(struct timer_list *l)
 {
-	struct nftimer_ctx *ctx = kpi_from_timer(ctx, l, timer);
+	struct nftimer_ctx *ctx = from_timer(ctx, l, timer);
 	int base;
 
 	spin_lock(&ctx->state->lock);
@@ -97,7 +98,7 @@ static int ltimer_create(lua_State *L)
 	ctx = lua_newuserdata(L, sizeof(struct nftimer_ctx));
 	luaL_setmetatable(L, NFLUA_TIMER);
 
-	ctx->state = luaU_getenv(L, struct nflua_state);
+	ctx->state = lunatik_getenv(L);
 	if (!state_get(ctx->state))
 		return luaL_error(L, "error incrementing state reference count");
 
