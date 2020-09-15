@@ -23,11 +23,8 @@ obj-$(CONFIG_NFLUA) += nflua.o
 nflua-objs += \
 	kpi_compat.o \
 	luaconn.o \
-	luanetlink.o \
 	luapacket.o \
 	luatimer.o \
 	luautil.o \
-	netlink.o \
 	nf_util.o \
-	states.o \
 	xt_lua.o

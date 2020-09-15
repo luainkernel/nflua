@@ -27,15 +27,15 @@
 #include <lauxlib.h>
 
 #include <lmemlib.h>
+#include <lunatik.h>
 
 #include "kpi_compat.h"
 #include "luautil.h"
-#include "states.h"
 #include "xt_lua.h"
 
 struct nf_conn *nflua_findconnid(lua_State *L)
 {
-	struct nflua_state *s = luaU_getenv(L, struct nflua_state);
+	lunatik_State *s = lunatik_getenv(L);
 	struct nf_conntrack_tuple tuple;
 	struct nf_conntrack_tuple_hash *hash;
 	size_t slen, dlen;
@@ -81,7 +81,7 @@ struct nf_conn *nflua_findconnid(lua_State *L)
 	tuple.src.u.all = htons(sport);
 	tuple.dst.u.all = htons(dport);
 
-	hash = nf_conntrack_find_get(sock_net(s->xt_lua->sock), KPI_CT_DEFAULT_ZONE, &tuple);
+	hash = nf_conntrack_find_get(&(s->instance.namespace), KPI_CT_DEFAULT_ZONE, &tuple);
 
 	if (hash == NULL)
 		return NULL;

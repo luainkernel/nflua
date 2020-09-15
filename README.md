@@ -29,8 +29,6 @@ rm -f deps/lua-memory/src/*.o
 The step above does not use `make` to avoid temporary files that would then be reused in the kernel module compilation below, leading to errors.
 Then build NFLua:
 ```bash
-make -C lib/
-make -C lua/
 make -C iptables/
 ```
 
@@ -52,7 +50,7 @@ CONFIG_NFLUA=m
 An example of the invocation:
 
 ```bash
-make -C /usr/src/linux-headers-`uname -r` M=$PWD \
+make -C /lib/modules/`uname -r`/build M=$PWD \
 CONFIG_LUNATIK=m \
 CONFIG_LUAMEMORY=m \
 CONFIG_LUAJSON=m \
@@ -75,13 +73,4 @@ sudo insmod ./src/nflua.ko
 To remove NFLua and its dependencies:
 ```bash
 sudo rmmod nflua luajson lua-memory luabase64 lunatik
-```
-
-Running the Tests
------------------
-
-```
-sudo LD_LIBRARY_PATH=./lib:./deps/lua-memory/src LUA_CPATH='./lua/?.so;;' \
-    XTABLES_LIBDIR=./iptables:/usr/lib/x86_64-linux-gnu/xtables \
-    lua tests/all.lua
 ```
